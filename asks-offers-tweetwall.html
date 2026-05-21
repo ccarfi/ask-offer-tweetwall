@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Asks &amp; Offers</title>
+<style>
+  :root {
+    --bg: #1a1a1a;
+    --fg: #f5f5f5;
+    --muted: rgba(245,245,245,0.55);
+    --chrome: rgba(245,245,245,0.12);
+    --chrome-hi: rgba(245,245,245,0.22);
+    --card-fg: #1a1a1a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: clamp(0.75rem, 2vw, 1.75rem) clamp(1rem, 3vw, 3rem);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+    z-index: 5;
+  }
+
+  h1 {
+    font-size: clamp(1.1rem, 2.2vw, 2rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .add-link {
+    color: var(--fg);
+    text-decoration: none;
+    font-size: clamp(0.85rem, 1.4vw, 1.15rem);
+    padding: 0.5em 1em;
+    border: 1px solid var(--chrome-hi);
+    border-radius: 999px;
+    opacity: 0.85;
+    transition: opacity 0.2s, background 0.2s;
+    white-space: nowrap;
+  }
+  .add-link:hover, .add-link:focus { opacity: 1; background: var(--chrome); }
+
+  main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    padding: clamp(0.5rem, 2vw, 2rem);
+  }
+
+  .card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(92vw, 1500px);
+    max-height: calc(100% - 2rem);
+    padding: clamp(1.5rem, 4vw, 4rem) clamp(1.75rem, 5vw, 5rem);
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    color: var(--card-fg);
+    display: flex;
+    flex-direction: column;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 2s ease;
+    will-change: opacity;
+  }
+  .card.active { opacity: 1; }
+
+  .badge {
+    align-self: flex-start;
+    font-size: clamp(0.85rem, 1.6vw, 1.75rem);
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.45em 1.1em;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.13);
+    margin-bottom: clamp(1rem, 3vh, 2.5rem);
+  }
+
+  .text {
+    font-size: clamp(1.6rem, 4.5vw, 6.5rem);
+    font-weight: 500;
+    line-height: 1.22;
+    letter-spacing: -0.01em;
+    flex: 1;
+    overflow-wrap: break-word;
+    overflow: hidden;
+  }
+  .text.size-medium {
+    font-size: clamp(1.4rem, 3vw, 4.2rem);
+    line-height: 1.3;
+  }
+  .text.size-small {
+    font-size: clamp(1.15rem, 2.3vw, 3rem);
+    line-height: 1.35;
+  }
+  .text.clipped {
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+            mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
+
+  .date {
+    margin-top: clamp(1rem, 3vh, 2.5rem);
+    font-size: clamp(0.8rem, 1.3vw, 1.25rem);
+    opacity: 0.65;
+    font-weight: 500;
+  }
+
+  /* Gear button + options panel */
+  .gear-btn {
+    position: fixed;
+    bottom: clamp(0.75rem, 2vw, 1.5rem);
+    right: clamp(0.75rem, 2vw, 1.5rem);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--chrome-hi);
+    background: var(--chrome);
+    color: var(--fg);
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .gear-btn:hover, .gear-btn:focus { background: var(--chrome-hi); }
+
+  .options {
+    position: fixed;
+    bottom: calc(clamp(0.75rem, 2vw, 1.5rem) + 56px);
+    right: clamp(0.75rem, 2vw, 1.5rem);
+    background: #262626;
+    border: 1px solid var(--chrome-hi);
+    padding: 1.1rem 1.2rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    display: none;
+    flex-direction: column;
+    gap: 0.9rem;
+    z-index: 20;
+    min-width: 240px;
+    font-size: 0.92rem;
+  }
+  .options.open { display: flex; }
+  .options .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .options label { color: var(--muted); font-weight: 500; }
+  .options .ctrl { display: flex; align-items: center; gap: 0.5rem; }
+  .options input[type=range] { width: 130px; accent-color: #c5a3ff; }
+  .options input[type=color] {
+    width: 38px; height: 28px;
+    border: 1px solid var(--chrome-hi);
+    border-radius: 6px;
+    background: transparent;
+    padding: 2px;
+    cursor: pointer;
+  }
+  .options .val { color: var(--fg); font-variant-numeric: tabular-nums; min-width: 2.2em; text-align: right; }
+  .options .reset {
+    background: none;
+    border: 1px solid var(--chrome-hi);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 0.35em 0.8em;
+    font-size: 0.85rem;
+    cursor: pointer;
+    align-self: flex-end;
+  }
+  .options .reset:hover { color: var(--fg); background: var(--chrome); }
+
+  .status {
+    position: fixed;
+    bottom: clamp(0.75rem, 2vw, 1.5rem);
+    left: clamp(0.75rem, 2vw, 1.5rem);
+    font-size: 0.8rem;
+    color: var(--muted);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* Subtle prev/next nav arrows */
+  .nav-btn {
+    position: fixed;
+    top: 50%;
+    width: clamp(44px, 4.5vw, 56px);
+    height: clamp(44px, 4.5vw, 56px);
+    border-radius: 50%;
+    border: 1px solid var(--chrome-hi);
+    background: var(--chrome);
+    color: var(--fg);
+    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    line-height: 1;
+    cursor: pointer;
+    z-index: 15;
+    opacity: 0.32;
+    display: flex; align-items: center; justify-content: center;
+    transform: translateY(-50%);
+    transition: opacity 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+  }
+  .nav-btn:hover, .nav-btn:focus { opacity: 1; background: var(--chrome-hi); outline: none; }
+  .nav-btn.prev { left: clamp(0.5rem, 2vw, 1.5rem); }
+  .nav-btn.next { right: clamp(0.5rem, 2vw, 1.5rem); }
+  @media (hover: none) {
+    .nav-btn { opacity: 0.55; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Asks &amp; Offers</h1>
+    <a class="add-link" id="addLink" href="#" target="_blank" rel="noopener">+ Add your own</a>
+  </header>
+
+  <main id="stage" aria-live="polite"></main>
+
+  <button class="nav-btn prev" id="prevBtn" aria-label="Previous card" title="Previous (&#8592;)">&#10094;</button>
+  <button class="nav-btn next" id="nextBtn" aria-label="Next card" title="Next (&#8594;)">&#10095;</button>
+
+  <button class="gear-btn" id="gearBtn" aria-label="Display options" title="Display options">&#9881;</button>
+
+  <div class="options" id="options" role="dialog" aria-label="Display options">
+    <div class="row">
+      <label for="speedInput">Speed</label>
+      <div class="ctrl">
+        <input type="range" id="speedInput" min="2" max="20" step="1" value="12">
+        <span class="val" id="speedVal">12s</span>
+      </div>
+    </div>
+    <div class="row">
+      <label for="askColor">Ask color</label>
+      <input type="color" id="askColor" value="#ffeb7a">
+    </div>
+    <div class="row">
+      <label for="offerColor">Offer color</label>
+      <input type="color" id="offerColor" value="#c5a3ff">
+    </div>
+    <button class="reset" id="resetBtn" type="button">Reset defaults</button>
+  </div>
+
+  <div class="status" id="status" hidden></div>
+
+<script>
+  // ---------- CONFIG ----------
+  // Publish key + GID of the public Board tab, from the published-to-web URL.
+  // (Same sheet referenced in your auto-memory under ask_offer_board.md.)
+  const PUB_KEY = "2PACX-1vSv8HCFA09JfKEVMnKVQmMcbSBhPjZKL0NJ6d-cTW_OyZ9euVBtyI6Jdf9nD0wrUW4YYrktcFCow-NH";
+  const GID = "1546909411";
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/" + PUB_KEY +
+                  "/pub?gid=" + GID + "&single=true&output=csv";
+  const FORM_URL = "https://forms.gle/h56X4h6H88RB8G787";
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  const DEFAULT_SPEED = 12;
+  const DEFAULT_ASK_COLOR = "#ffeb7a";
+  const DEFAULT_OFFER_COLOR = "#c5a3ff";
+
+  // Clearly-marked sample placeholders shown when the board has no open items.
+  const SAMPLE_PLACEHOLDERS = [
+    { type: "ask",   text: "EXAMPLE — Looking to borrow a stand mixer for a baking project this weekend.", date: new Date() },
+    { type: "offer", text: "EXAMPLE — Have extra tomato seedlings if anyone wants to start a garden.",     date: new Date() },
+    { type: "ask",   text: "EXAMPLE — Need a ride to the airport early Saturday morning.",                 date: new Date() },
+    { type: "offer", text: "EXAMPLE — Free piano lessons for kids, Tuesdays after school.",                date: new Date() },
+    { type: "ask",   text: "EXAMPLE — Anyone have a kids' bike (~16\") to pass along?",                    date: new Date() },
+    { type: "offer", text: "EXAMPLE — Happy to dogsit this summer for anyone going on vacation.",          date: new Date() }
+  ];
+
+  // ---------- STATE ----------
+  let items = [];
+  let queue = [];
+  let intervalSec = DEFAULT_SPEED;
+  let askColor = DEFAULT_ASK_COLOR;
+  let offerColor = DEFAULT_OFFER_COLOR;
+  let timer = null;
+  let activeEl = null;
+  let usingPlaceholders = false;
+
+  // ---------- CSV PARSER ----------
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const rows = [];
+    let row = [], field = "", inQuotes = false, i = 0;
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ",") { row.push(field); field = ""; i++; continue; }
+      if (c === "\n" || c === "\r") {
+        row.push(field); rows.push(row); row = []; field = "";
+        if (c === "\r" && text[i+1] === "\n") i += 2; else i++;
+        continue;
+      }
+      field += c; i++;
+    }
+    if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  // ---------- FETCH + EXTRACT ----------
+  // Board layout: A = Ask text, B = Ask date, C = spacer, D = Offer text, E = Offer date.
+  // Header row is also checked ("ask"/"offer" keywords) so reorderings still work.
+  function extractItems(rows) {
+    if (rows.length < 2) return [];
+    const header = rows[0].map(s => (s || "").toLowerCase());
+    let askTextCol = -1, offerTextCol = -1;
+    for (let i = 0; i < header.length; i++) {
+      if (askTextCol < 0 && header[i].includes("ask")) askTextCol = i;
+      if (offerTextCol < 0 && header[i].includes("offer")) offerTextCol = i;
+    }
+    if (askTextCol < 0) askTextCol = 0;
+    if (offerTextCol < 0) offerTextCol = 3;
+    const askDateCol = askTextCol + 1;
+    const offerDateCol = offerTextCol + 1;
+
+    const out = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const at = (row[askTextCol]   || "").trim();
+      const ad = (row[askDateCol]   || "").trim();
+      const ot = (row[offerTextCol] || "").trim();
+      const od = (row[offerDateCol] || "").trim();
+      if (at) out.push({ type: "ask",   text: at, date: parseDate(ad) });
+      if (ot) out.push({ type: "offer", text: ot, date: parseDate(od) });
+    }
+    return out;
+  }
+
+  function parseDate(s) {
+    if (!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatDate(d) {
+    if (!d) return "";
+    const now = new Date();
+    const diffDays = Math.floor((now - d) / 86400000);
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays > 1 && diffDays < 7) return diffDays + " days ago";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  async function fetchItems() {
+    try {
+      const res = await fetch(CSV_URL + "&t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+      const parsed = extractItems(parseCSV(text));
+      if (parsed.length === 0) {
+        usingPlaceholders = true;
+        items = SAMPLE_PLACEHOLDERS.slice();
+      } else {
+        usingPlaceholders = false;
+        items = parsed;
+      }
+      reshuffle();
+      setStatus("");
+    } catch (e) {
+      console.warn("[Asks & Offers] fetch failed:", e);
+      if (items.length === 0) {
+        usingPlaceholders = true;
+        items = SAMPLE_PLACEHOLDERS.slice();
+        reshuffle();
+      }
+      setStatus("offline — showing cached items");
+    }
+  }
+
+  // ---------- SHUFFLE ----------
+  function reshuffle() {
+    queue = items.map((_, i) => i);
+    for (let i = queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+  }
+
+  // ---------- RENDER ----------
+  // History holds the actual item objects, not indices, so it survives reshuffles
+  // and data refreshes. Capped to avoid unbounded growth on long-running displays.
+  let history = [];
+  let pos = -1;
+  const HISTORY_MAX = 200;
+
+  function renderCard(item) {
+    const stage = document.getElementById("stage");
+    const card = document.createElement("div");
+    card.className = "card " + item.type;
+    card.style.background = item.type === "ask" ? askColor : offerColor;
+
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = item.type === "ask" ? "Ask" : "Offer";
+
+    const text = document.createElement("div");
+    const len = item.text.length;
+    let sizeClass = "";
+    if (len > 240) sizeClass = " size-small";
+    else if (len > 120) sizeClass = " size-medium";
+    text.className = "text" + sizeClass;
+    text.textContent = item.text;
+
+    const date = document.createElement("div");
+    date.className = "date";
+    date.textContent = formatDate(item.date);
+
+    card.appendChild(badge);
+    card.appendChild(text);
+    card.appendChild(date);
+    stage.appendChild(card);
+
+    // Force reflow, flag any text still overflowing the card, then fade in.
+    void card.offsetHeight;
+    if (text.scrollHeight > text.clientHeight + 1) {
+      text.classList.add("clipped");
+    }
+    card.classList.add("active");
+
+    if (activeEl) {
+      const prev = activeEl;
+      prev.classList.remove("active");
+      setTimeout(() => prev.remove(), 2100);
+    }
+    activeEl = card;
+  }
+
+  function advance() {
+    // Re-visit a forward item in history if we previously stepped back.
+    if (pos < history.length - 1) {
+      pos++;
+      renderCard(history[pos]);
+      return;
+    }
+    // Otherwise pull a fresh item from the shuffle queue.
+    if (queue.length === 0) reshuffle();
+    if (queue.length === 0) return;
+    const idx = queue.shift();
+    const item = items[idx];
+    if (!item) return;
+    history.push(item);
+    if (history.length > HISTORY_MAX) history.shift();
+    pos = history.length - 1;
+    renderCard(item);
+  }
+
+  function reverse() {
+    if (pos <= 0) return;
+    pos--;
+    renderCard(history[pos]);
+  }
+
+  function startRotation() {
+    if (timer) clearInterval(timer);
+    advance();
+    timer = setInterval(advance, intervalSec * 1000);
+  }
+
+  function resetTimer() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(advance, intervalSec * 1000);
+  }
+
+  // ---------- OPTIONS UI ----------
+  const gearBtn       = document.getElementById("gearBtn");
+  const optionsEl     = document.getElementById("options");
+  const speedInput    = document.getElementById("speedInput");
+  const speedVal      = document.getElementById("speedVal");
+  const askColorInput = document.getElementById("askColor");
+  const offerColorInput = document.getElementById("offerColor");
+  const resetBtn      = document.getElementById("resetBtn");
+  const statusEl      = document.getElementById("status");
+
+  document.getElementById("addLink").href = FORM_URL;
+
+  gearBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    optionsEl.classList.toggle("open");
+  });
+  document.addEventListener("click", (e) => {
+    if (!optionsEl.contains(e.target) && e.target !== gearBtn) {
+      optionsEl.classList.remove("open");
+    }
+  });
+
+  speedInput.addEventListener("input", () => {
+    intervalSec = parseInt(speedInput.value, 10);
+    speedVal.textContent = intervalSec + "s";
+    resetTimer();
+  });
+
+  askColorInput.addEventListener("input", () => {
+    askColor = askColorInput.value;
+    if (activeEl && activeEl.classList.contains("ask")) {
+      activeEl.style.background = askColor;
+    }
+  });
+
+  offerColorInput.addEventListener("input", () => {
+    offerColor = offerColorInput.value;
+    if (activeEl && activeEl.classList.contains("offer")) {
+      activeEl.style.background = offerColor;
+    }
+  });
+
+  resetBtn.addEventListener("click", () => {
+    intervalSec = DEFAULT_SPEED;
+    askColor = DEFAULT_ASK_COLOR;
+    offerColor = DEFAULT_OFFER_COLOR;
+    speedInput.value = String(DEFAULT_SPEED);
+    speedVal.textContent = DEFAULT_SPEED + "s";
+    askColorInput.value = DEFAULT_ASK_COLOR;
+    offerColorInput.value = DEFAULT_OFFER_COLOR;
+    if (activeEl) {
+      activeEl.style.background = activeEl.classList.contains("ask") ? askColor : offerColor;
+    }
+    resetTimer();
+  });
+
+  function setStatus(msg) {
+    if (!msg) { statusEl.hidden = true; statusEl.textContent = ""; }
+    else { statusEl.hidden = false; statusEl.textContent = msg; }
+  }
+
+  // ---------- NAV CONTROLS ----------
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+
+  prevBtn.addEventListener("click", () => { reverse(); resetTimer(); });
+  nextBtn.addEventListener("click", () => { advance(); resetTimer(); });
+
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+    if (e.key === "ArrowLeft") { reverse(); resetTimer(); }
+    else if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); advance(); resetTimer(); }
+  });
+
+  // ---------- BOOT ----------
+  (async () => {
+    await fetchItems();
+    startRotation();
+    setInterval(fetchItems, REFRESH_MS);
+  })();
+</script>
+</body>
+</html>
